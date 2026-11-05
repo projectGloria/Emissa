@@ -44,9 +44,11 @@ impl Queue {
         });
         let scope = app.asset_protocol_scope();
         for j in &mut jobs {
-            // We crashed or quit mid-upload. Its session URI is still valid, so it can resume later.
-            if j.state == JobState::Uploading || j.state == JobState::Queued {
-                j.state = JobState::Paused;
+            // Quit or crashed mid-upload: put it back at the head of the line. The worker sees
+            // the saved session URI, asks the server for the committed offset, and carries on.
+            // Queued jobs stay queued, so the whole queue continues on launch, in order.
+            if j.state == JobState::Uploading {
+                j.state = JobState::Queued;
             }
             // Asset scope is runtime-only; re-grant preview access for persisted files.
             let _ = scope.allow_file(&j.path);

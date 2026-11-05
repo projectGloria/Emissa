@@ -2,6 +2,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::settings::VideoDefaults;
+
 pub const VIDEO_EXTS: &[&str] = &[
     "mp4", "mov", "mkv", "webm", "avi", "wmv", "flv", "m4v", "mpg", "mpeg", "3gp", "mts", "m2ts",
 ];
@@ -23,6 +25,31 @@ pub struct Metadata {
     pub category_id: String,
     pub privacy: Privacy,
     pub made_for_kids: bool,
+    // Every field added after beta v1 gets a serde default, so a queue.json written by an
+    // older build still deserializes. Without it, one missing field makes the whole file
+    // unreadable, and load() would start empty, dropping in-flight upload sessions.
+    /// "Altered or synthetic content" disclosure (YouTube's AI-use question).
+    #[serde(default)]
+    pub contains_synthetic_media: bool,
+    #[serde(default = "yes")]
+    pub embeddable: bool,
+    /// Not part of the video resource; sent as the `notifySubscribers` query param on insert.
+    #[serde(default = "yes")]
+    pub notify_subscribers: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Caption {
+    pub path: String,
+    /// BCP-47 code, e.g. "en", "tr", "zh-Hans".
+    pub language: String,
+    /// Track name shown in the player's CC menu; may be empty.
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,6 +73,9 @@ pub struct Job {
     pub mime: String,
     pub metadata: Metadata,
     pub thumbnail: Option<String>,
+    /// Uploaded after the video finishes, like the thumbnail.
+    #[serde(default)]
+    pub captions: Vec<Caption>,
     pub state: JobState,
     /// Resumable session URI. Persisted so an upload survives an app restart (valid ~1 week).
     pub session_uri: Option<String>,
@@ -58,7 +88,7 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn from_path(path: &Path, size: u64) -> Self {
+    pub fn from_path(path: &Path, size: u64, defaults: &VideoDefaults) -> Self {
         let file_name = path
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
@@ -76,16 +106,10 @@ impl Job {
                 .first()
                 .map(|m| m.essence_str().to_owned())
                 .unwrap_or_else(|| "video/*".into()),
-            metadata: Metadata {
-                // Take characters, not bytes, so a multi-byte UTF-8 char is never split.
-                title: sanitize(&stem).chars().take(100).collect(),
-                description: String::new(),
-                tags: vec![],
-                category_id: "22".into(), // "People & Blogs", YouTube's own default
-                privacy: Privacy::Private,
-                made_for_kids: false,
-            },
+            // Take characters, not bytes, so a multi-byte UTF-8 char is never split.
+            metadata: defaults.to_metadata(sanitize(&stem).chars().take(100).collect()),
             thumbnail: None,
+            captions: vec![],
             state: JobState::Draft,
             session_uri: None,
             bytes_sent: 0,
@@ -151,7 +175,24 @@ mod tests {
             category_id: "22".into(),
             privacy: Privacy::Private,
             made_for_kids: false,
+            contains_synthetic_media: false,
+            embeddable: true,
+            notify_subscribers: true,
         }
+    }
+
+    /// A queue.json written by beta v1 (none of the newer fields) must still load.
+    #[test]
+    fn loads_beta_v1_queue() {
+        let v1 = r#"[{"id":"a","path":"C:/v.mp4","fileName":"v.mp4","size":1,"mime":"video/mp4",
+            "metadata":{"title":"t","description":"","tags":[],"categoryId":"22","privacy":"private","madeForKids":false},
+            "thumbnail":null,"state":"uploading","sessionUri":"https://x/s","bytesSent":8388608,
+            "videoId":null,"error":null,"warning":null}]"#;
+        let jobs: Vec<Job> = serde_json::from_str(v1).unwrap();
+        assert_eq!(jobs[0].session_uri.as_deref(), Some("https://x/s"));
+        assert!(jobs[0].metadata.embeddable && jobs[0].metadata.notify_subscribers);
+        assert!(!jobs[0].metadata.contains_synthetic_media);
+        assert!(jobs[0].captions.is_empty());
     }
 
     #[test]
@@ -174,10 +215,24 @@ mod tests {
 
     #[test]
     fn job_defaults() {
-        let j = Job::from_path(Path::new(r"C:\v\My <Clip>.MP4"), 10);
+        let d = VideoDefaults { privacy: Privacy::Unlisted, ..VideoDefaults::default() };
+        let j = Job::from_path(Path::new(r"C:\v\My <Clip>.MP4"), 10, &d);
         assert_eq!(j.metadata.title, "My Clip");
+        assert_eq!(j.metadata.privacy, Privacy::Unlisted); // settings defaults are applied
         assert_eq!(j.mime, "video/mp4");
         assert!(is_video(Path::new("a.MKV")));
         assert!(!is_video(Path::new("a.txt")));
+    }
+}
+
+/// Opt-in check against the real on-disk queue: `YUTUB_QUEUE=path cargo test real_queue -- --ignored`
+#[cfg(test)]
+#[test]
+#[ignore]
+fn real_queue_loads() {
+    let p = std::env::var("YUTUB_QUEUE").expect("set YUTUB_QUEUE");
+    let jobs: Vec<Job> = serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap();
+    for j in &jobs {
+        println!("{:?} {} sent={} session={}", j.state, j.file_name, j.bytes_sent, j.session_uri.is_some());
     }
 }

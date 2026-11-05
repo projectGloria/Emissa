@@ -1,7 +1,6 @@
 import { CloudUpload, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/app/Logo";
 import { AccountMenu } from "../auth/AccountMenu";
 import { pickFiles } from "@/lib/files";
 import { QueueItem } from "./QueueItem";
@@ -31,11 +30,8 @@ export function QueueSidebar({ jobs, selectedId, onSelect, channel, onSignOut }:
 
   return (
     <aside className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-12 items-center px-4">
-        <Logo />
-      </div>
-
-      <div className="flex gap-2 px-3 pb-3">
+      {/* The logo moved to the custom title bar; this row just needs breathing room under it. */}
+      <div className="flex gap-2 px-3 pt-3 pb-3">
         <Button variant="secondary" className="flex-1" onClick={() => void pickFiles()}>
           <Plus /> Add videos
         </Button>

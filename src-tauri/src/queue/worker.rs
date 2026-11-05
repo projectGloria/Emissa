@@ -15,7 +15,7 @@ use super::{EVT_FINISHED, EVT_PROGRESS, Queue};
 use crate::auth::Auth;
 use crate::error::{AppError, AppResult};
 use crate::youtube::upload::{self, ChunkResult, Recovery};
-use crate::youtube::{UPLOAD_BASE, thumbnail};
+use crate::youtube::{UPLOAD_BASE, captions, thumbnail};
 
 const MAX_RETRIES: u32 = 10;
 
@@ -39,6 +39,12 @@ struct Finished<'a> {
 
 pub async fn run(app: AppHandle, q: Arc<Queue>, auth: Arc<Auth>, http: reqwest::Client) {
     loop {
+        // Signed out (or the refresh token died): park instead of burning every queued job
+        // into Failed. The sign_in command wakes us when there's a token again.
+        if !auth.is_signed_in().unwrap_or(false) {
+            q.notify.notified().await;
+            continue;
+        }
         match q.claim_next() {
             Some((job, cancel)) => run_job(&app, &q, &auth, &http, job, cancel).await,
             None => q.notify.notified().await,
@@ -84,15 +90,27 @@ async fn run_job(app: &AppHandle, q: &Queue, auth: &Auth, http: &reqwest::Client
 
     match result {
         Ok(video_id) => {
-            // Re-read: the user may have picked a thumbnail while the video was uploading.
-            let thumb = q.get(&id).and_then(|j| j.thumbnail);
-            let warning = match thumb {
-                Some(t) => match set_thumb(auth, http, &video_id, Path::new(&t)).await {
-                    Ok(()) => None,
-                    Err(e) => Some(format!("Video uploaded, but the thumbnail failed: {e}")),
-                },
-                None => None,
-            };
+            // Re-read: thumbnail and subtitles stay editable while the video uploads.
+            let latest = q.get(&id);
+            let mut problems = vec![];
+            if let Some(t) = latest.as_ref().and_then(|j| j.thumbnail.clone()) {
+                if let Err(e) = set_thumb(auth, http, &video_id, Path::new(&t)).await {
+                    problems.push(format!("thumbnail failed: {e}"));
+                }
+            }
+            for c in latest.map(|j| j.captions).unwrap_or_default() {
+                // One bad subtitle file shouldn't stop the others, so collect errors instead of `?`.
+                let r = async {
+                    let token = auth.access_token().await?;
+                    captions::insert_default(http, &token, &video_id, &c).await
+                }
+                .await;
+                if let Err(e) = r {
+                    let file = Path::new(&c.path).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+                    problems.push(format!("subtitles {file} ({}) failed: {e}", c.language));
+                }
+            }
+            let warning = (!problems.is_empty()).then(|| format!("Video uploaded, but {}", problems.join("; ")));
             let _ = q.update_job(&id, |j| {
                 j.state = JobState::Done;
                 j.video_id = Some(video_id.clone());
@@ -105,6 +123,14 @@ async fn run_job(app: &AppHandle, q: &Queue, auth: &Auth, http: &reqwest::Client
                 EVT_FINISHED,
                 Finished { id: &id, title: &job.metadata.title, ok: true, message: warning },
             );
+        }
+        // Auth died mid-upload. That's not the job's fault: requeue it (the session URI is
+        // kept) and let the run loop park until the user signs in again.
+        Err(AppError::NotSignedIn) => {
+            let _ = q.update_job(&id, |j| {
+                j.state = JobState::Queued;
+                Ok(())
+            });
         }
         Err(e) => {
             let msg = e.to_string();

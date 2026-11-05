@@ -51,3 +51,35 @@ export const CATEGORIES: { id: string; label: string }[] = [
 export const VIDEO_EXTENSIONS = [
   "mp4", "mov", "mkv", "webm", "avi", "wmv", "flv", "m4v", "mpg", "mpeg", "3gp", "mts", "m2ts",
 ];
+
+export const CAPTION_EXTENSIONS = ["srt", "vtt", "sbv", "sub", "ttml", "dfxp", "scc", "smi", "sami", "lrc", "stl", "cap"];
+
+// BCP-47 codes YouTube accepts for caption tracks. The common ones; extend as needed.
+export const LANGUAGES: { code: string; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "tr", label: "Turkish" },
+  { code: "de", label: "German" },
+  { code: "fr", label: "French" },
+  { code: "es", label: "Spanish" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "uk", label: "Ukrainian" },
+  { code: "pl", label: "Polish" },
+  { code: "nl", label: "Dutch" },
+  { code: "sv", label: "Swedish" },
+  { code: "ar", label: "Arabic" },
+  { code: "fa", label: "Persian" },
+  { code: "hi", label: "Hindi" },
+  { code: "id", label: "Indonesian" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "zh-Hans", label: "Chinese (Simplified)" },
+  { code: "zh-Hant", label: "Chinese (Traditional)" },
+];
+
+/** Best-effort language guess from a file name like `episode.tr.srt` or `en_subs.vtt`. */
+export function guessLanguage(fileName: string): string {
+  const parts = fileName.toLowerCase().split(/[._\-\s]+/);
+  return LANGUAGES.find((l) => parts.includes(l.code.toLowerCase()))?.code ?? "en";
+}

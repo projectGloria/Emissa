@@ -95,6 +95,8 @@ pub fn video_body(meta: &Metadata) -> serde_json::Value {
         "status": {
             "privacyStatus": meta.privacy,
             "selfDeclaredMadeForKids": meta.made_for_kids,
+            "containsSyntheticMedia": meta.contains_synthetic_media,
+            "embeddable": meta.embeddable,
         }
     })
 }
@@ -110,7 +112,12 @@ pub async fn start_session(
 ) -> AppResult<String> {
     let resp = http
         .post(format!("{base}/videos"))
-        .query(&[("uploadType", "resumable"), ("part", "snippet,status")])
+        .query(&[
+            ("uploadType", "resumable"),
+            ("part", "snippet,status"),
+            // Query param, not a body field: it controls the notification, not the video resource.
+            ("notifySubscribers", if meta.notify_subscribers { "true" } else { "false" }),
+        ])
         .bearer_auth(token)
         .header("X-Upload-Content-Length", total)
         .header("X-Upload-Content-Type", mime)
@@ -246,6 +253,9 @@ mod tests {
             category_id: "22".into(),
             privacy: Privacy::Private,
             made_for_kids: false,
+            contains_synthetic_media: true,
+            embeddable: false,
+            notify_subscribers: false,
         }
     }
 
@@ -259,6 +269,8 @@ mod tests {
         let start = server
             .mock_async(|when, then| {
                 when.method(POST).path("/videos").query_param("uploadType", "resumable")
+                    .query_param("notifySubscribers", "false")
+                    .json_body_includes(r#"{"status":{"containsSyntheticMedia":true,"embeddable":false}}"#)
                     .header("x-upload-content-length", total.to_string());
                 then.status(200).header("Location", session_url.as_str());
             })

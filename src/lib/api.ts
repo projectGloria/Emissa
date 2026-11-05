@@ -13,6 +13,22 @@ export interface Metadata {
   categoryId: string;
   privacy: Privacy;
   madeForKids: boolean;
+  containsSyntheticMedia: boolean;
+  embeddable: boolean;
+  notifySubscribers: boolean;
+}
+
+/** Everything a new video starts with except its title (which comes from the file name). */
+export type VideoDefaults = Omit<Metadata, "title">;
+
+export interface Settings {
+  defaults: VideoDefaults;
+}
+
+export interface Caption {
+  path: string;
+  language: string;
+  name: string;
 }
 
 export interface Job {
@@ -23,6 +39,7 @@ export interface Job {
   mime: string;
   metadata: Metadata;
   thumbnail: string | null;
+  captions: Caption[];
   state: JobState;
   sessionUri: string | null;
   bytesSent: number;
@@ -94,6 +111,8 @@ export const api = {
   addFiles: (paths: string[]) => invoke<string[]>("add_files", { paths }),
   updateMetadata: (id: string, metadata: Metadata) => invoke<void>("update_metadata", { id, metadata }),
   setThumbnail: (id: string, path: string | null) => invoke<void>("set_thumbnail", { id, path }),
+  setCaptions: (id: string, captions: Caption[]) => invoke<void>("set_captions", { id, captions }),
+  captionAccess: () => invoke<boolean>("caption_access"),
   start: (id: string) => invoke<void>("start", { id }),
   startAll: () => invoke<number>("start_all"),
   pause: (id: string) => invoke<void>("pause", { id }),
@@ -103,4 +122,8 @@ export const api = {
   remove: (id: string) => invoke<void>("remove", { id }),
   clearDone: () => invoke<void>("clear_done"),
   reorder: (ids: string[]) => invoke<void>("reorder", { ids }),
+
+  getSettings: () => invoke<Settings>("get_settings"),
+  setSettings: (value: Settings) => invoke<void>("set_settings", { value }),
+  openDataDir: () => invoke<void>("open_data_dir"),
 };

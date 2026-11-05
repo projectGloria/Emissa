@@ -8,8 +8,8 @@ import { validate } from "@/lib/metadata";
 import { StatusBadge } from "../queue/StatusBadge";
 import { MetadataEditor } from "./MetadataEditor";
 import { ThumbnailPicker } from "./ThumbnailPicker";
-import { VideoPreview } from "./VideoPreview";
 import { UploadStatus } from "./UploadStatus";
+import { SubtitlesPicker } from "./SubtitlesPicker";
 
 const run = (p: Promise<unknown>) => p.catch((e) => toast.error(errorMessage(e)));
 
@@ -44,7 +44,13 @@ function useDebouncedSave(id: string, delay = 400) {
   return { schedule, flush };
 }
 
-export function JobPanel({ job }: { job: Job }) {
+interface JobPanelProps {
+  job: Job;
+  canCaption: boolean | null;
+  onReauth: () => void;
+}
+
+export function JobPanel({ job, canCaption, onReauth }: JobPanelProps) {
   // Initial state from props is legit here ONLY because the parent keys us by job.id.
   // This component instance belongs to exactly one job, and this editor is the only writer.
   const [draft, setDraft] = useState<Metadata>(job.metadata);
@@ -82,9 +88,9 @@ export function JobPanel({ job }: { job: Job }) {
         <div className="mx-auto grid max-w-5xl gap-6 p-6 @3xl:grid-cols-[minmax(0,1fr)_300px]">
           <MetadataEditor draft={draft} onChange={onChange} locked={locked} />
           <aside className="space-y-4 @3xl:order-last">
-            <VideoPreview path={job.path} />
-            <ThumbnailPicker job={job} />
-            <UploadStatus job={job} />
+            {/* Status rides on the thumbnail card's bottom edge, so the two read as one unit. */}
+            <ThumbnailPicker job={job} status={<UploadStatus job={job} />} />
+            <SubtitlesPicker job={job} canCaption={canCaption} onReauth={onReauth} />
           </aside>
         </div>
       </div>

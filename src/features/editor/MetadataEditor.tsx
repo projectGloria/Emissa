@@ -130,6 +130,58 @@ export function MetadataEditor({ draft, onChange, locked }: Props) {
           </label>
         </div>
       </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Altered or synthetic content</Label>
+        <ToggleRow
+          title="This video contains realistic altered or AI-generated content"
+          hint="Makes a real person say or do something they didn't, alters footage of a real event or place, or shows a realistic scene that didn't happen. Selecting this adds a label to the video."
+          checked={draft.containsSyntheticMedia}
+          onChange={(containsSyntheticMedia) => onChange({ containsSyntheticMedia })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Distribution</Label>
+        <div className="divide-y divide-border rounded-lg border border-border">
+          <ToggleRow
+            bare
+            title="Allow embedding"
+            hint="Let other websites embed this video."
+            checked={draft.embeddable}
+            onChange={(embeddable) => onChange({ embeddable })}
+          />
+          <ToggleRow
+            bare
+            title="Publish to subscriptions feed and notify subscribers"
+            hint="Only applies when the video goes public. Turn off for bulk uploads so you don't spam your subscribers."
+            checked={draft.notifySubscribers}
+            onChange={(notifySubscribers) => onChange({ notifySubscribers })}
+          />
+        </div>
+      </div>
     </fieldset>
+  );
+}
+
+interface ToggleRowProps {
+  title: string;
+  hint: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  /** Inside a bordered group, so no own border. */
+  bare?: boolean;
+}
+
+function ToggleRow({ title, hint, checked, onChange, bare }: ToggleRowProps) {
+  return (
+    // <label> wrapping the Switch makes the whole row clickable with no extra handler.
+    <label className={cn("flex cursor-pointer items-start justify-between gap-4 p-3", !bare && "rounded-lg border border-border")}>
+      <span className="space-y-0.5">
+        <span className="block text-sm">{title}</span>
+        <span className="block text-xs leading-relaxed text-muted-foreground">{hint}</span>
+      </span>
+      <Switch className="mt-0.5" checked={checked} onCheckedChange={onChange} />
+    </label>
   );
 }

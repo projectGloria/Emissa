@@ -3,7 +3,8 @@
 Lightweight desktop app for uploading videos to your own YouTube channel.
 Tauri 2 · Rust · React 19 · TypeScript · Tailwind v4 · shadcn/ui.
 
-- Queue many videos, with per-video title, description, tags, visibility, category, audience, and thumbnail.
+- Queue many videos, with per-video title, description, tags, visibility, category, audience, thumbnail,
+  subtitle files, altered/AI-content disclosure, embedding, and subscriber notification.
 - Resumable uploads streamed from disk in 8 MiB chunks. Pause and resume work, and uploads survive an app restart.
 - Automatic retry with backoff on network errors, and token refresh on a 401.
 - OAuth via the system browser (loopback + PKCE). The refresh token is stored in Windows Credential Manager.
@@ -31,7 +32,10 @@ cd src-tauri && cargo test
 
 ## Known limits
 
-- Default quota is 10k units/day, and one upload costs about 1600, so roughly 6 uploads/day.
+- Uploads count against a separate "Video Uploads" bucket: 1 unit each, capped at 100/day.
+  Subtitles cost 400 units each from the regular 10k/day pool.
+- Paid promotion, automatic chapters, featured places, automatic concepts and Shorts remixing can't be set via the API.
+  Set them in Studio.
 - Unverified API projects: uploads are forced to private until Google's compliance audit.
 
 See [todo.md](todo.md) for open issues.

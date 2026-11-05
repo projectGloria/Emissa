@@ -3,18 +3,30 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
-import { api, errorMessage, EVT, isAppError, type Channel, type Finished } from "@/lib/api";
+import { api, errorMessage, EVT, isAppError, type Channel, type Finished, type SetupStatus } from "@/lib/api";
 import { startQueueSync, useJobs } from "@/lib/queueStore";
 import { addFiles } from "@/lib/files";
 import { QueueSidebar } from "./queue/QueueSidebar";
 import { DropZone } from "./queue/DropZone";
 import { JobPanel } from "./editor/JobPanel";
+import { SettingsDialog } from "./settings/SettingsDialog";
 
-export function MainApp({ onSignedOut }: { onSignedOut: () => void }) {
+interface Props {
+  settingsOpen: boolean;
+  onSettingsOpenChange: (open: boolean) => void;
+  onStatusChange: (s: SetupStatus) => void;
+}
+
+const SIGNED_OUT: SetupStatus = { hasClient: true, signedIn: false };
+
+export function MainApp({ settingsOpen, onSettingsOpenChange, onStatusChange }: Props) {
+  const onSignedOut = () => onStatusChange(SIGNED_OUT);
   const jobs = useJobs();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [channel, setChannel] = useState<Channel | null>(null);
   const [dragging, setDragging] = useState(false);
+  // null = unknown yet. Fetched once; a re-grant goes through sign-out, which remounts MainApp.
+  const [canCaption, setCanCaption] = useState<boolean | null>(null);
 
   // Derived, not synced: if the selected job is removed, fall back to the first one
   // during render. No effect running "if selected disappeared, reselect".
@@ -31,7 +43,13 @@ export function MainApp({ onSignedOut }: { onSignedOut: () => void }) {
     let ignore = false;
     api
       .getChannel()
-      .then((c) => !ignore && setChannel(c))
+      .then((c) => {
+        if (ignore) return;
+        setChannel(c);
+        // Sequenced after the channel call, so the token refresh it triggered is reused
+        // instead of racing a second refresh.
+        return api.captionAccess().then((ok) => !ignore && setCanCaption(ok));
+      })
       .catch((e) => {
         if (ignore) return;
         if (isAppError(e) && e.kind === "notSignedIn") handleSignedOut();
@@ -85,8 +103,20 @@ export function MainApp({ onSignedOut }: { onSignedOut: () => void }) {
       <main className="min-w-0 overflow-hidden">
         {/* key = job id: switching jobs remounts the editor, resetting its local draft
             state from the new job's props. No useEffect "sync props to state" needed. */}
-        {selected ? <JobPanel key={selected.id} job={selected} /> : <DropZone />}
+        {selected ? (
+          <JobPanel key={selected.id} job={selected} canCaption={canCaption} onReauth={signOut} />
+        ) : (
+          <DropZone />
+        )}
       </main>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={onSettingsOpenChange}
+        channel={channel}
+        onSignOut={signOut}
+        onStatusChange={onStatusChange}
+      />
 
       {dragging && (
         <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm">

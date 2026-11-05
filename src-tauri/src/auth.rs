@@ -21,6 +21,9 @@ const KEYRING_SERVICE: &str = "com.yutub.app";
 const KEYRING_USER: &str = "google-refresh-token";
 const SCOPE_UPLOAD: &str = "https://www.googleapis.com/auth/youtube.upload";
 const SCOPE_READONLY: &str = "https://www.googleapis.com/auth/youtube.readonly";
+/// Needed only for captions.insert. Optional: if the user unticks it, everything except
+/// subtitles still works, so it's deliberately not in REQUIRED_SCOPES.
+pub const SCOPE_FORCE_SSL: &str = "https://www.googleapis.com/auth/youtube.force-ssl";
 /// (scope, what breaks without it). Used to tell the user exactly which checkbox they unticked.
 const REQUIRED_SCOPES: &[(&str, &str)] = &[
     (SCOPE_UPLOAD, "Manage your YouTube videos"),
@@ -57,6 +60,9 @@ pub struct Auth {
     // A tokio Mutex, held across the refresh `.await`, on purpose: concurrent callers
     // queue behind one refresh request instead of all hitting the token endpoint at once.
     token: Mutex<Option<AccessToken>>,
+    /// Scopes Google says this grant actually has (refreshed with every token response).
+    /// Kept so the UI can tell whether subtitle upload is possible without a doomed API call.
+    granted: std::sync::Mutex<Option<String>>,
 }
 
 fn keyring_entry() -> AppResult<keyring::Entry> {
@@ -96,6 +102,7 @@ impl Auth {
             http,
             client: RwLock::new(config::load(app)?),
             token: Mutex::new(None),
+            granted: std::sync::Mutex::new(None),
         })
     }
 
@@ -132,7 +139,7 @@ impl Auth {
                 ("client_id", creds.client_id.as_str()),
                 ("redirect_uri", redirect_uri.as_str()),
                 ("response_type", "code"),
-                ("scope", &format!("{SCOPE_UPLOAD} {SCOPE_READONLY}")),
+                ("scope", &format!("{SCOPE_UPLOAD} {SCOPE_READONLY} {SCOPE_FORCE_SSL}")),
                 ("code_challenge", challenge.as_str()),
                 ("code_challenge_method", "S256"),
                 ("state", state.as_str()),
@@ -192,6 +199,7 @@ impl Auth {
             .clone()
             .ok_or_else(|| AppError::msg("Google did not return a refresh token."))?;
         keyring_entry()?.set_password(&refresh)?;
+        self.set_granted(tok.scope.clone());
         self.store(tok).await;
         Ok(())
     }
@@ -207,7 +215,20 @@ impl Auth {
                 .await;
         }
         *self.token.lock().await = None;
+        self.set_granted(None);
         clear_refresh_token()
+    }
+
+    fn set_granted(&self, scope: Option<String>) {
+        *self.granted.lock().unwrap_or_else(|p| p.into_inner()) = scope;
+    }
+
+    /// Whether the current grant includes `scope`. Forces a token refresh if we haven't
+    /// talked to Google since launch, because that response is where the scope list comes from.
+    pub async fn has_scope(&self, scope: &str) -> AppResult<bool> {
+        self.access_token().await?;
+        let g = self.granted.lock().unwrap_or_else(|p| p.into_inner());
+        Ok(g.as_deref().is_some_and(|s| s.split_whitespace().any(|x| x == scope)))
     }
 
     async fn store(&self, tok: TokenResponse) {
@@ -254,6 +275,9 @@ impl Auth {
             Err(e) => return Err(e),
         };
         let value = tok.access_token.clone();
+        if tok.scope.is_some() {
+            self.set_granted(tok.scope.clone());
+        }
         *guard = Some(AccessToken {
             value: tok.access_token,
             expires_at: Instant::now() + Duration::from_secs(tok.expires_in),

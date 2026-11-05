@@ -9,12 +9,14 @@ use crate::auth::Auth;
 use crate::config;
 use crate::error::{AppError, AppResult};
 use crate::queue::Queue;
-use crate::queue::job::{self, Job, JobState, Metadata};
-use crate::youtube::{channel, thumbnail};
+use crate::settings::{Settings, SettingsStore};
+use crate::queue::job::{self, Caption, Job, JobState, Metadata};
+use crate::youtube::{captions, channel, thumbnail};
 
 type AuthS<'a> = State<'a, Arc<Auth>>;
 type QueueS<'a> = State<'a, Arc<Queue>>;
 type HttpS<'a> = State<'a, reqwest::Client>;
+type SettingsS<'a> = State<'a, Arc<SettingsStore>>;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,15 +47,30 @@ pub async fn import_client_json(app: AppHandle, auth: AuthS<'_>, path: String) -
 }
 
 #[tauri::command]
-pub async fn sign_in(app: AppHandle, auth: AuthS<'_>) -> AppResult<()> {
-    auth.sign_in(&app).await
+pub async fn sign_in(app: AppHandle, auth: AuthS<'_>, q: QueueS<'_>) -> AppResult<()> {
+    auth.sign_in(&app).await?;
+    // The worker parks while signed out; queued uploads continue the moment we're back.
+    q.wake();
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn sign_out(auth: AuthS<'_>, q: QueueS<'_>) -> AppResult<()> {
-    // Stop anything in flight first; its requests would fail without a token anyway.
-    pause_all_inner(&q)?;
-    auth.sign_out().await
+    // Clear the token BEFORE stopping the upload, so the worker parks (is_signed_in == false)
+    // instead of immediately re-claiming the job we're about to requeue.
+    let res = auth.sign_out().await;
+    // Requeue, don't pause: signing out to re-grant permissions shouldn't leave the user a
+    // wall of Resume buttons. The worker continues the queue after the next sign_in.
+    q.update(|inner| {
+        for j in inner.jobs.iter_mut().filter(|j| j.state == JobState::Uploading) {
+            j.state = JobState::Queued;
+        }
+        for t in inner.cancels.values() {
+            t.cancel();
+        }
+        Ok(())
+    })?;
+    res
 }
 
 #[tauri::command]
@@ -82,8 +99,9 @@ pub fn list_jobs(q: QueueS<'_>) -> Vec<Job> {
 
 /// Returns the file names that were rejected (not a video, or already queued).
 #[tauri::command]
-pub fn add_files(app: AppHandle, q: QueueS<'_>, paths: Vec<String>) -> AppResult<Vec<String>> {
+pub fn add_files(app: AppHandle, q: QueueS<'_>, settings: SettingsS<'_>, paths: Vec<String>) -> AppResult<Vec<String>> {
     let scope = app.asset_protocol_scope();
+    let defaults = settings.get().defaults;
     let mut rejected = vec![];
     let mut fresh = vec![];
     let existing: Vec<String> = q
@@ -94,19 +112,27 @@ pub fn add_files(app: AppHandle, q: QueueS<'_>, paths: Vec<String>) -> AppResult
         .collect();
 
     for p in paths {
-        let path = PathBuf::from(&p);
-        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(p.clone());
+        let raw = PathBuf::from(&p);
+        let name = raw.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(p.clone());
+        // Windows hands us the 8.3 alias (INTERV~4.MKV) for paths over MAX_PATH. canonicalize
+        // resolves it to the real long name, so the title, the display name and the duplicate
+        // check all see the same path. dunce drops the verbatim `\\?\` prefix where that's safe.
+        let Ok(path) = std::fs::canonicalize(&raw).map(|c| dunce::simplified(&c).to_path_buf()) else {
+            rejected.push(name);
+            continue;
+        };
+        let key = path.to_string_lossy().into_owned();
         let Ok(meta) = std::fs::metadata(&path) else {
             rejected.push(name);
             continue;
         };
-        if !meta.is_file() || !job::is_video(&path) || existing.contains(&p) {
+        if !meta.is_file() || !job::is_video(&path) || existing.contains(&key) {
             rejected.push(name);
             continue;
         }
         // Grant asset:// read access to exactly this file, for the preview player.
         scope.allow_file(&path)?;
-        fresh.push(Job::from_path(&path, meta.len()));
+        fresh.push(Job::from_path(&path, meta.len(), &defaults));
     }
     if !fresh.is_empty() {
         q.update(|inner| {
@@ -143,6 +169,31 @@ pub fn set_thumbnail(app: AppHandle, q: QueueS<'_>, id: String, path: Option<Str
         j.thumbnail = path;
         Ok(())
     })
+}
+
+/// Replaces the job's subtitle list. Like the thumbnail, subtitles go up after the video
+/// finishes, so they stay editable during the upload.
+#[tauri::command]
+pub fn set_captions(q: QueueS<'_>, id: String, captions: Vec<Caption>) -> AppResult<()> {
+    for c in &captions {
+        captions::validate(Path::new(&c.path))?;
+        if c.language.trim().is_empty() {
+            return Err(AppError::msg("Each subtitle file needs a language."));
+        }
+    }
+    q.update_job(&id, |j| {
+        if j.state == JobState::Done {
+            return Err(AppError::msg("Already uploaded. Add subtitles in YouTube Studio."));
+        }
+        j.captions = captions;
+        Ok(())
+    })
+}
+
+/// Whether the current Google grant can upload captions (the optional youtube.force-ssl scope).
+#[tauri::command]
+pub async fn caption_access(auth: AuthS<'_>) -> AppResult<bool> {
+    auth.has_scope(crate::auth::SCOPE_FORCE_SSL).await
 }
 
 fn enqueue(j: &mut Job) -> AppResult<()> {
@@ -189,20 +240,6 @@ pub fn pause(q: QueueS<'_>, id: String) -> AppResult<()> {
             }
         }
         if let Some(t) = inner.cancels.get(&id) {
-            t.cancel();
-        }
-        Ok(())
-    })
-}
-
-fn pause_all_inner(q: &Queue) -> AppResult<()> {
-    q.update(|inner| {
-        for j in inner.jobs.iter_mut() {
-            if matches!(j.state, JobState::Uploading | JobState::Queued) {
-                j.state = JobState::Paused;
-            }
-        }
-        for t in inner.cancels.values() {
             t.cancel();
         }
         Ok(())
@@ -268,4 +305,26 @@ pub fn reorder(q: QueueS<'_>, ids: Vec<String>) -> AppResult<()> {
             .sort_by_key(|j| ids.iter().position(|i| *i == j.id).unwrap_or(usize::MAX));
         Ok(())
     })
+}
+
+// ---------- settings ----------
+
+#[tauri::command]
+pub fn get_settings(settings: SettingsS<'_>) -> Settings {
+    settings.get()
+}
+
+#[tauri::command]
+pub fn set_settings(settings: SettingsS<'_>, value: Settings) -> AppResult<()> {
+    settings.set(value)
+}
+
+/// Opens %APPDATA%\com.yutub.app (client JSON, queue, settings) in Explorer.
+#[tauri::command]
+pub fn open_data_dir(app: AppHandle) -> AppResult<()> {
+    let dir = app.path().app_config_dir()?;
+    std::fs::create_dir_all(&dir)?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| AppError::msg(e.to_string()))
 }

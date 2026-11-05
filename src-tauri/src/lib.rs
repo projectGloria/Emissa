@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod error;
 mod queue;
+mod settings;
 mod youtube;
 
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub fn run() {
             let http = youtube::http_client()?;
             let auth = Arc::new(auth::Auth::new(&handle, http.clone())?);
             let q = Arc::new(queue::Queue::load(handle.clone())?);
+            app.manage(Arc::new(settings::SettingsStore::load(&handle)?));
 
             app.manage(http.clone());
             app.manage(auth.clone());
@@ -39,6 +41,8 @@ pub fn run() {
             commands::add_files,
             commands::update_metadata,
             commands::set_thumbnail,
+            commands::set_captions,
+            commands::caption_access,
             commands::start,
             commands::start_all,
             commands::pause,
@@ -48,6 +52,9 @@ pub fn run() {
             commands::remove,
             commands::clear_done,
             commands::reorder,
+            commands::get_settings,
+            commands::set_settings,
+            commands::open_data_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

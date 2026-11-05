@@ -1,3 +1,4 @@
+pub mod captions;
 pub mod channel;
 pub mod thumbnail;
 pub mod upload;

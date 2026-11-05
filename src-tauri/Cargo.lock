@@ -5600,6 +5600,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "dunce",
  "futures-util",
  "httpmock",
  "keyring",

@@ -33,6 +33,8 @@ uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
 base64 = "0.22"
 url = "2"
+# Strips the verbatim `\\?\` prefix std::fs::canonicalize adds on Windows (only when safe to do so).
+dunce = "1"
 
 [dev-dependencies]
 httpmock = "0.8"

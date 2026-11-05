@@ -2,20 +2,19 @@
 
 ## Bugs
 
-- [ ] **8.3 short paths stored verbatim.** When a file's full path exceeds MAX_PATH (260 chars), Windows hands
-  the app its 8.3 alias (e.g. `INTERV~4.MKV`). Effects: wrong file name in the queue, default title becomes
-  `INTERV~4`, and duplicate detection misses the same file added via its long path, which risks a double upload and
-  wasted quota.
-  **Fix:** in `add_files` (`src-tauri/src/commands.rs`), resolve each path with `std::fs::canonicalize` (expands
-  short names) and strip the `\\?\` prefix for display with the `dunce` crate. Dedupe on the canonical path.
-  Changes Rust code, so it restarts `tauri dev` (in-flight uploads resume afterwards).
+- [x] ~~8.3 short paths stored verbatim (`INTERV~4.MKV`).~~ Fixed: `add_files` canonicalizes + `dunce`.
+  Jobs added before the fix keep their short path (harmless for upload; just the display name).
 
 ## Features
 
 - [ ] Drag-to-reorder in the queue sidebar. The backend `reorder(ids)` command already exists, but the UI has no drag handles.
 - [ ] Scheduled publishing (`status.publishAt`) and playlist assignment.
 - [ ] Metadata templates (reusable description/tags blocks).
-- [ ] Show the remaining daily quota estimate (about 1600 units per upload, 10k per day by default).
+- [ ] Show quota usage: uploads use the separate "Video Uploads" bucket (1 unit each, 100/day cap);
+  captions (400 each), thumbnails (50) and other calls come from the regular 10k/day pool.
+- [ ] "Resume all" button for paused jobs.
+- [ ] Studio-only settings (no API write access, checked Nov 2026): paid promotion, automatic chapters,
+  featured places, automatic concepts, Shorts remixing. Re-check the API changelog periodically.
 
 ## Google project / ops
 
