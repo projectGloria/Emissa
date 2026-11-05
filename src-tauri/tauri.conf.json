@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Yutub",
+  "productName": "Emissa",
   "version": "0.1.0",
   "identifier": "com.yutub.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Yutub",
+        "title": "Emissa",
         "width": 1200,
         "height": 780,
         "minWidth": 960,

@@ -1,6 +1,7 @@
-# Yutub
+# Emissa
 
 Lightweight desktop app for uploading videos to your own YouTube channel.
+Emissa (from *emissary*): it carries your videos off for you. Formerly developed as "Yutub".
 Tauri 2 · Rust · React 19 · TypeScript · Tailwind v4 · shadcn/ui.
 
 - Queue many videos, with per-video title, description, tags, visibility, category, audience, thumbnail,
@@ -18,6 +19,8 @@ Tauri 2 · Rust · React 19 · TypeScript · Tailwind v4 · shadcn/ui.
 5. Run the app, pick that JSON, and sign in.
 
 The client JSON is copied to `%APPDATA%\com.yutub.app\` and is never committed.
+(The internal app ID still says `yutub` on purpose: changing it would move the data folder and the stored
+sign-in, resetting every existing install.)
 
 ## Develop
 

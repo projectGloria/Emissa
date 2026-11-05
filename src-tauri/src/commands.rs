@@ -319,7 +319,7 @@ pub fn set_settings(settings: SettingsS<'_>, value: Settings) -> AppResult<()> {
     settings.set(value)
 }
 
-/// Opens %APPDATA%\com.yutub.app (client JSON, queue, settings) in Explorer.
+/// Opens the app data dir, %APPDATA%\com.yutub.app (client JSON, queue, settings) in Explorer.
 #[tauri::command]
 pub fn open_data_dir(app: AppHandle) -> AppResult<()> {
     let dir = app.path().app_config_dir()?;

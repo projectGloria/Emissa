@@ -1,4 +1,4 @@
-# Yutub — TODO
+# Emissa — TODO
 
 ## Bugs
 
@@ -25,6 +25,6 @@
 
 ## Release
 
-- [ ] App icon (`npx tauri icon <source.png>`); currently the default Tauri icon.
+- [x] ~~App icon~~: `app-icon.svg` → `npx tauri icon app-icon.svg` (delete the generated android/ios folders).
 - [ ] `npm run tauri build` and check the installer size and idle RAM.
 - [ ] MSI requires a numeric-only pre-release version (e.g. `1.0.0-1`, not `1.0.0-beta.1`). Pick a versioning scheme before the first installer.

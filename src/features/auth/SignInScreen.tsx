@@ -37,7 +37,7 @@ export function SignInScreen({ onDone }: { onDone: () => void }) {
         <CardHeader>
           <CardTitle>Sign in to YouTube</CardTitle>
           <CardDescription>
-            Your browser opens to Google. Yutub only asks for permission to upload videos and read your channel name.
+            Your browser opens to Google. Emissa asks to upload videos, read your channel name, and (optionally) add subtitles.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

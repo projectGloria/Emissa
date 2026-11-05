@@ -33,7 +33,7 @@ export function SettingsDialog({ open, onOpenChange, channel, onSignOut, onStatu
       <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>Options</DialogTitle>
-          <DialogDescription className="sr-only">Yutub preferences</DialogDescription>
+          <DialogDescription className="sr-only">Emissa preferences</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="defaults" className="min-h-0 gap-0">
           <div className="px-6">

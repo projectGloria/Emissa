@@ -17,7 +17,7 @@ pub fn http_client() -> AppResult<reqwest::Client> {
         // CRITICAL: the resumable protocol answers "chunk accepted, send more" with
         // HTTP 308. reqwest treats 3xx as a redirect by default, so it must not follow them.
         .redirect(reqwest::redirect::Policy::none())
-        .user_agent(concat!("Yutub/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Emissa/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15))
         // Per-read timeout, not total: a 4 GB upload may take hours, but a socket
         // that has gone silent for 2 minutes is dead.

@@ -56,7 +56,7 @@ pub async fn insert(
         "snippet": { "videoId": video_id, "language": c.language, "name": c.name, "isDraft": false }
     });
     // A UUID can't plausibly appear inside a subtitle file, so it's a safe boundary.
-    let boundary = format!("yutub-{}", uuid::Uuid::new_v4().simple());
+    let boundary = format!("emissa-{}", uuid::Uuid::new_v4().simple());
     let resp = http
         .post(format!("{base}/captions"))
         .query(&[("part", "snippet"), ("uploadType", "multipart")])
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn formats() {
-        let dir = std::env::temp_dir().join(format!("yutub-cap-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("emissa-cap-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let srt = dir.join("a.SRT");
         std::fs::write(&srt, "x").unwrap();
@@ -119,7 +119,7 @@ mod tests {
                 then.status(200).json_body(json!({"id": "cap1"}));
             })
             .await;
-        let dir = std::env::temp_dir().join(format!("yutub-cap-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("emissa-cap-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("en.srt");
         std::fs::write(&f, "1\n00:00:00,000 --> 00:00:01,000\nhi\n").unwrap();

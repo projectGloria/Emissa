@@ -225,12 +225,12 @@ mod tests {
     }
 }
 
-/// Opt-in check against the real on-disk queue: `YUTUB_QUEUE=path cargo test real_queue -- --ignored`
+/// Opt-in check against the real on-disk queue: `EMISSA_QUEUE=path cargo test real_queue -- --ignored`
 #[cfg(test)]
 #[test]
 #[ignore]
 fn real_queue_loads() {
-    let p = std::env::var("YUTUB_QUEUE").expect("set YUTUB_QUEUE");
+    let p = std::env::var("EMISSA_QUEUE").expect("set EMISSA_QUEUE");
     let jobs: Vec<Job> = serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap();
     for j in &jobs {
         println!("{:?} {} sent={} session={}", j.state, j.file_name, j.bytes_sent, j.session_uri.is_some());

@@ -1,13 +1,13 @@
 [package]
-name = "yutub"
+name = "emissa"
 version = "0.1.0"
-description = "Lightweight YouTube uploader"
+description = "Emissa: lightweight desktop uploader for your YouTube channel"
 authors = ["Nihil"]
 edition = "2024"
 
 [lib]
 # `_lib` suffix avoids a bin/lib name clash on Windows (cargo#8519).
-name = "yutub_lib"
+name = "emissa_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

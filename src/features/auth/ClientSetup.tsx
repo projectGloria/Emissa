@@ -40,7 +40,7 @@ export function ClientSetup({ onDone }: { onDone: (s: SetupStatus) => void }) {
         <CardHeader>
           <CardTitle>Connect a Google Cloud client</CardTitle>
           <CardDescription>
-            One-time setup. Yutub talks to YouTube through your own API project, so your quota and data stay yours.
+            One-time setup. Emissa talks to YouTube through your own API project, so your quota and data stay yours.
           </CardDescription>
         </CardHeader>
         <CardContent>

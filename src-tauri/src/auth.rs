@@ -17,6 +17,8 @@ use tokio::sync::{Mutex, RwLock};
 use crate::config::{self, ClientCreds};
 use crate::error::{AppError, AppResult};
 
+// Legacy ID from when the app was called Yutub, kept on purpose: the stored refresh token
+// lives under this key, so renaming it would silently sign every existing user out.
 const KEYRING_SERVICE: &str = "com.yutub.app";
 const KEYRING_USER: &str = "google-refresh-token";
 const SCOPE_UPLOAD: &str = "https://www.googleapis.com/auth/youtube.upload";
@@ -189,7 +191,7 @@ impl Auth {
                 .send()
                 .await;
             return Err(AppError::msg(format!(
-                "Yutub needs every permission to work. Sign in again and keep these ticked: {}.",
+                "Emissa needs every permission to work. Sign in again and keep these ticked: {}.",
                 missing.join(", ")
             )));
         }
@@ -313,9 +315,9 @@ async fn parse_token_response(resp: reqwest::Response) -> AppResult<TokenRespons
     })
 }
 
-const DONE_HTML: &str = "<!doctype html><meta charset=utf-8><title>Yutub</title>\
+const DONE_HTML: &str = "<!doctype html><meta charset=utf-8><title>Emissa</title>\
 <body style=\"font:16px system-ui;background:#0a0a0a;color:#eee;display:grid;place-items:center;height:100vh;margin:0\">\
-<div style=\"text-align:center\"><h2>Signed in to Yutub</h2><p style=\"opacity:.6\">You can close this tab.</p></div>";
+<div style=\"text-align:center\"><h2>Signed in to Emissa</h2><p style=\"opacity:.6\">You can close this tab.</p></div>";
 
 /// A minimal one-shot HTTP server. We only need the request line, so no HTTP crate.
 /// We keep looping because browsers may hit `/favicon.ico` first.

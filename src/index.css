@@ -131,14 +131,15 @@
     @apply font-sans;
     }
 }
-/* ---------- Yutub ---------- */
+/* ---------- Emissa ---------- */
 .dark {
   /* Slightly blue-shifted near-black reads more "app" than flat neutral. */
   --background: oklch(0.16 0.005 270);
   --card: oklch(0.2 0.006 270);
   --popover: oklch(0.21 0.006 270);
   --sidebar: oklch(0.18 0.005 270);
-  --brand: oklch(0.63 0.23 27);
+  /* Violet, deliberately not YouTube red: the brand must not read as YouTube's. */
+  --brand: oklch(0.6 0.2 285);
   --brand-foreground: oklch(0.985 0 0);
   --success: oklch(0.72 0.17 155);
 }

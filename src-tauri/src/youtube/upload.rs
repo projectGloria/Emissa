@@ -296,7 +296,7 @@ mod tests {
             })
             .await;
 
-        let dir = std::env::temp_dir().join(format!("yutub-test-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("emissa-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("v.mp4");
         std::fs::write(&file, vec![7u8; total as usize]).unwrap();
