@@ -1,0 +1,47 @@
+[package]
+name = "yutub"
+version = "0.1.0"
+description = "Lightweight YouTube uploader"
+authors = ["Nihil"]
+edition = "2024"
+
+[lib]
+# `_lib` suffix avoids a bin/lib name clash on Windows (cargo#8519).
+name = "yutub_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `protocol-asset` lets the webview stream local video/thumbnail previews via asset:// without IPC copies.
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "sync", "time"] }
+tokio-util = "0.7"
+reqwest = { version = "0.13", features = ["json", "stream", "form", "query"] }
+futures-util = "0.3"
+bytes = "1"
+# v3 has the stable Entry API; `windows-native` = Windows Credential Manager.
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
+thiserror = "2"
+mime_guess = "2"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+base64 = "0.22"
+url = "2"
+
+[dev-dependencies]
+httpmock = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+# https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
