@@ -1,5 +1,8 @@
-import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
-import type { Job } from "@/lib/api";
+import { useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Link2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { api, errorMessage, type Job } from "@/lib/api";
 import { formatBytes, formatEta, formatSpeed } from "@/lib/format";
 import { useProgress } from "@/lib/queueStore";
 import { cn } from "@/lib/utils";
@@ -7,14 +10,67 @@ import { cn } from "@/lib/utils";
 // Compact strips designed to sit flush under the thumbnail inside ThumbnailPicker's card.
 // Each draws its own top border, so for drafts nothing renders and the card ends at the image.
 
+function VideoLinkRow({ videoId }: { videoId: string }) {
+  const [copied, setCopied] = useState(false);
+  const fullUrl = `https://youtu.be/${videoId}`;
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 border-t border-border px-3 py-2 text-xs">
+      <Link2 className="size-3.5 shrink-0 text-muted-foreground" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => api.openVideo(videoId).catch((e) => toast.error(errorMessage(e)))}
+            className="inline-flex min-w-0 items-center gap-1 truncate font-medium text-foreground underline-offset-2 hover:text-brand hover:underline"
+          >
+            <span className="truncate">youtu.be/{videoId}</span>
+            <ExternalLink className="size-3 shrink-0 opacity-60" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Open {fullUrl}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="Copy video URL"
+            onClick={() => void copyUrl()}
+            className="ml-auto rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{copied ? "Copied!" : "Copy link"}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 /** Its own component so the 10 Hz progress subscription doesn't re-render the form. */
 function LiveProgress({ job }: { job: Job }) {
   const p = useProgress(job.id);
   const live = job.state === "uploading" && p;
-  const sent = live ? p.bytesSent : job.bytesSent;
+  const sent = job.videoId ? job.size : live ? p.bytesSent : job.bytesSent;
   const bps = live ? p.bps : 0;
   const pct = job.size ? (sent / job.size) * 100 : 0;
-  const right = job.state === "uploading" ? formatSpeed(bps) : job.state === "paused" ? "Paused" : "Waiting…";
+  const right = job.videoId
+    ? "Finishing…"
+    : job.state === "uploading"
+      ? formatSpeed(bps)
+      : job.state === "paused"
+        ? "Paused"
+        : "Waiting…";
 
   return (
     <div className="border-t border-border">
@@ -35,9 +91,20 @@ function LiveProgress({ job }: { job: Job }) {
         </span>
         <span className="text-muted-foreground">
           {right}
-          {live && bps > 1 && ` · ${formatEta(job.size - sent, bps)}`}
+          {!job.videoId && live && bps > 1 && ` · ${formatEta(job.size - sent, bps)}`}
         </span>
       </div>
+      {job.videoId ? (
+        <VideoLinkRow videoId={job.videoId} />
+      ) : (
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Link2 className="size-3.5 shrink-0" />
+            <span>youtu.be/…</span>
+          </span>
+          <span className="text-[11px]">Link assigned at 100%</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -64,8 +131,8 @@ export function UploadStatus({ job }: { job: Job }) {
         <div className="flex items-center gap-2 border-t border-success/30 bg-success/10 px-3 py-2 text-xs">
           <CheckCircle2 className="size-3.5 shrink-0 text-success" />
           <span className="font-medium text-success">Uploaded</span>
-          <span className="ml-auto truncate text-muted-foreground select-text">youtu.be/{job.videoId}</span>
         </div>
+        {job.videoId && <VideoLinkRow videoId={job.videoId} />}
         {job.warning && (
           <div className="flex gap-2 border-t border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
             <AlertTriangle className="mt-px size-3.5 shrink-0" />

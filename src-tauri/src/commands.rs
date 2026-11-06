@@ -63,7 +63,7 @@ pub async fn sign_out(auth: AuthS<'_>, q: QueueS<'_>) -> AppResult<()> {
     // wall of Resume buttons. The worker continues the queue after the next sign_in.
     q.update(|inner| {
         for j in inner.jobs.iter_mut().filter(|j| j.state == JobState::Uploading) {
-            j.state = JobState::Queued;
+            j.state = if j.video_id.is_some() { JobState::Done } else { JobState::Queued };
         }
         for t in inner.cancels.values() {
             t.cancel();
@@ -79,14 +79,27 @@ pub async fn get_channel(auth: AuthS<'_>, http: HttpS<'_>) -> AppResult<channel:
     channel::mine(&http, &token).await
 }
 
-#[tauri::command]
-pub async fn open_in_studio(app: AppHandle, video_id: String) -> AppResult<()> {
+fn validate_video_id(video_id: &str) -> AppResult<()> {
     // The ID is interpolated into a URL, so whitelist its charset rather than trusting the caller.
     if video_id.is_empty() || !video_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err(AppError::msg("Invalid video ID"));
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_in_studio(app: AppHandle, video_id: String) -> AppResult<()> {
+    validate_video_id(&video_id)?;
     app.opener()
         .open_url(format!("https://studio.youtube.com/video/{video_id}/edit"), None::<&str>)
+        .map_err(|e| AppError::msg(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn open_video(app: AppHandle, video_id: String) -> AppResult<()> {
+    validate_video_id(&video_id)?;
+    app.opener()
+        .open_url(format!("https://youtu.be/{video_id}"), None::<&str>)
         .map_err(|e| AppError::msg(e.to_string()))
 }
 
@@ -233,7 +246,7 @@ pub fn start_all(q: QueueS<'_>) -> AppResult<usize> {
 pub fn pause(q: QueueS<'_>, id: String) -> AppResult<()> {
     q.update(|inner| {
         if let Some(j) = inner.jobs.iter_mut().find(|j| j.id == id) {
-            if matches!(j.state, JobState::Uploading | JobState::Queued) {
+            if matches!(j.state, JobState::Uploading | JobState::Queued) && j.video_id.is_none() {
                 // Set the state BEFORE cancelling, so the worker sees its job already
                 // moved on and doesn't overwrite it.
                 j.state = JobState::Paused;
@@ -257,7 +270,7 @@ pub fn resume(q: QueueS<'_>, id: String) -> AppResult<()> {
 pub fn cancel(q: QueueS<'_>, id: String) -> AppResult<()> {
     q.update(|inner| {
         if let Some(j) = inner.jobs.iter_mut().find(|j| j.id == id) {
-            if j.state != JobState::Done {
+            if j.state != JobState::Done && j.video_id.is_none() {
                 j.state = JobState::Draft;
                 j.session_uri = None;
                 j.bytes_sent = 0;

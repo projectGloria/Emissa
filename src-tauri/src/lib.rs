@@ -104,6 +104,7 @@ pub fn run() {
             commands::sign_out,
             commands::get_channel,
             commands::open_in_studio,
+            commands::open_video,
             commands::list_jobs,
             commands::add_files,
             commands::update_metadata,

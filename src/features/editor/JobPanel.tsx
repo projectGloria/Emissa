@@ -130,6 +130,15 @@ function Actions({ job, invalid, onUpload }: { job: Job; invalid: string | null;
       );
     case "queued":
     case "uploading":
+      if (job.videoId) {
+        return (
+          <div className="flex items-center gap-1.5">
+            <Button variant="secondary" onClick={() => job.videoId && run(api.openInStudio(job.videoId))}>
+              <ExternalLink /> Open in Studio
+            </Button>
+          </div>
+        );
+      }
       return (
         <div className="flex items-center gap-1.5">
           {cancel}

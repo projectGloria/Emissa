@@ -90,6 +90,14 @@ async fn run_job(app: &AppHandle, q: &Queue, auth: &Auth, http: &reqwest::Client
 
     match result {
         Ok(video_id) => {
+            // Broadcast the video ID as soon as the video bytes finish so the UI can show
+            // the youtu.be link immediately while the thumbnail and subtitles are uploaded.
+            let _ = q.update_job(&id, |j| {
+                j.video_id = Some(video_id.clone());
+                j.bytes_sent = total;
+                j.session_uri = None;
+                Ok(())
+            });
             // Re-read: thumbnail and subtitles stay editable while the video uploads.
             let latest = q.get(&id);
             let mut problems = vec![];
@@ -113,9 +121,6 @@ async fn run_job(app: &AppHandle, q: &Queue, auth: &Auth, http: &reqwest::Client
             let warning = (!problems.is_empty()).then(|| format!("Video uploaded, but {}", problems.join("; ")));
             let _ = q.update_job(&id, |j| {
                 j.state = JobState::Done;
-                j.video_id = Some(video_id.clone());
-                j.bytes_sent = total;
-                j.session_uri = None;
                 j.warning = warning.clone();
                 Ok(())
             });

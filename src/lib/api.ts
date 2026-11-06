@@ -107,6 +107,7 @@ export const api = {
   signOut: () => invoke<void>("sign_out"),
   getChannel: () => invoke<Channel>("get_channel"),
   openInStudio: (videoId: string) => invoke<void>("open_in_studio", { videoId }),
+  openVideo: (videoId: string) => invoke<void>("open_video", { videoId }),
 
   listJobs: () => invoke<Job[]>("list_jobs"),
   addFiles: (paths: string[]) => invoke<string[]>("add_files", { paths }),
