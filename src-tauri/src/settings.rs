@@ -59,6 +59,7 @@ impl VideoDefaults {
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub defaults: VideoDefaults,
+    pub allow_system_tray: bool,
 }
 
 pub struct SettingsStore {
@@ -104,7 +105,9 @@ mod tests {
         assert_eq!(s.defaults.privacy, Privacy::Unlisted);
         assert!(s.defaults.embeddable);
         assert_eq!(s.defaults.category_id, "22");
+        assert!(!s.allow_system_tray);
         let empty: Settings = serde_json::from_str("{}").unwrap();
         assert!(empty.defaults.notify_subscribers);
+        assert!(!empty.allow_system_tray);
     }
 }

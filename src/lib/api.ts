@@ -23,6 +23,7 @@ export type VideoDefaults = Omit<Metadata, "title">;
 
 export interface Settings {
   defaults: VideoDefaults;
+  allowSystemTray: boolean;
 }
 
 export interface Caption {

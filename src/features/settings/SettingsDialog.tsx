@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Logo } from "@/components/app/Logo";
-import { api, errorMessage, type Channel, type Privacy, type SetupStatus, type VideoDefaults } from "@/lib/api";
+import { api, errorMessage, type Channel, type Privacy, type Settings, type SetupStatus, type VideoDefaults } from "@/lib/api";
 import { byteLen, CATEGORIES, LIMITS } from "@/lib/metadata";
 import { TagInput } from "../editor/TagInput";
 
@@ -35,15 +35,19 @@ export function SettingsDialog({ open, onOpenChange, channel, onSignOut, onStatu
           <DialogTitle>Options</DialogTitle>
           <DialogDescription className="sr-only">Emissa preferences</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="defaults" className="min-h-0 gap-0">
+        <Tabs defaultValue="general" className="min-h-0 gap-0">
           <div className="px-6">
             <TabsList>
+              <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="defaults">New video defaults</TabsTrigger>
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
             </TabsList>
           </div>
           <div className="max-h-[calc(85vh-7.5rem)] overflow-y-auto px-6 pt-5 pb-6">
+            <TabsContent value="general">
+              <GeneralTab />
+            </TabsContent>
             <TabsContent value="defaults">
               <DefaultsTab />
             </TabsContent>
@@ -57,6 +61,66 @@ export function SettingsDialog({ open, onOpenChange, channel, onSignOut, onStatu
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------- General ----------
+
+function GeneralTab() {
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [isSaving, startSaving] = useTransition();
+
+  useEffect(() => {
+    let ignore = false;
+    api.getSettings().then((s) => {
+      if (!ignore) setSettings(s);
+    });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  if (!settings) return <Loader2 className="mx-auto my-10 size-5 animate-spin text-muted-foreground" />;
+
+  const handleTrayChange = (allowSystemTray: boolean) => {
+    const next: Settings = { ...settings, allowSystemTray };
+    setSettings(next);
+    startSaving(async () => {
+      try {
+        await api.setSettings(next);
+        toast.success(
+          allowSystemTray
+            ? "System tray enabled: Emissa will keep running in the tray when closed."
+            : "System tray disabled: Emissa will exit when closed.",
+        );
+      } catch (e) {
+        setSettings(settings);
+        toast.error(errorMessage(e));
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium">Application behavior</h3>
+        <div className="divide-y divide-border rounded-lg border border-border">
+          <label className="flex cursor-pointer items-center justify-between gap-4 px-3.5 py-3">
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">Allow system tray</div>
+              <div className="text-xs text-muted-foreground">
+                Keep Emissa running in the system tray when closing the window so background uploads continue.
+              </div>
+            </div>
+            <Switch
+              checked={settings.allowSystemTray}
+              onCheckedChange={handleTrayChange}
+              disabled={isSaving}
+            />
+          </label>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -74,6 +138,7 @@ const FACTORY: VideoDefaults = {
 };
 
 function DefaultsTab() {
+  const [fullSettings, setFullSettings] = useState<Settings | null>(null);
   const [draft, setDraft] = useState<VideoDefaults | null>(null);
   // What's on disk, kept to derive `dirty` instead of tracking it in another state.
   const [saved, setSaved] = useState<VideoDefaults | null>(null);
@@ -83,6 +148,7 @@ function DefaultsTab() {
     let ignore = false;
     api.getSettings().then((s) => {
       if (ignore) return;
+      setFullSettings(s);
       setDraft(s.defaults);
       setSaved(s.defaults);
     });
@@ -100,7 +166,10 @@ function DefaultsTab() {
   const save = () =>
     startSaving(async () => {
       try {
-        await api.setSettings({ defaults: draft });
+        const base = fullSettings ?? (await api.getSettings());
+        const next: Settings = { ...base, defaults: draft };
+        await api.setSettings(next);
+        setFullSettings(next);
         setSaved(draft);
         toast.success("Defaults saved", { description: "Applied to videos you add from now on." });
       } catch (e) {

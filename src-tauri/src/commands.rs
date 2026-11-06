@@ -315,7 +315,10 @@ pub fn get_settings(settings: SettingsS<'_>) -> Settings {
 }
 
 #[tauri::command]
-pub fn set_settings(settings: SettingsS<'_>, value: Settings) -> AppResult<()> {
+pub fn set_settings(app: AppHandle, settings: SettingsS<'_>, value: Settings) -> AppResult<()> {
+    if let Some(tray) = app.tray_by_id("main_tray") {
+        let _ = tray.set_visible(value.allow_system_tray);
+    }
     settings.set(value)
 }
 
