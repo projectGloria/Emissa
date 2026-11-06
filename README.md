@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app-icon.svg" alt="Emissa Icon" width="108" height="108" />
+<img src="docs/assets/icon.png" alt="Emissa Icon" width="112" height="112" />
 
 # Emissa
 
