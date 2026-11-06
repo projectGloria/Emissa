@@ -1,22 +1,24 @@
 import { cn } from "@/lib/utils";
-
-/** Paper-plane mark: Emissa (from "emissary") sends your videos off. Same path as app-icon.svg. */
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={cn("fill-current", className)} aria-hidden>
-      <path d="M21 3 3 10.5l7 3.5 3.5 7Z" className="stroke-current stroke-[1.6]" strokeLinejoin="round" />
-      {/* The fold: a cut-out line from the tail toward the nose, which gives the plane depth. */}
-      <path d="M10 14 16 8" className="fill-none stroke-brand stroke-[1.6]" strokeLinecap="round" />
-    </svg>
-  );
-}
+// Vite resolves this to a content-hashed URL at build time, so swapping the PNG busts the
+// WebView cache automatically. Same artwork as src-tauri/icons (256px copy of 128x128@2x).
+import logoUrl from "@/assets/emissa-logo.png";
 
 export function Logo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span className="grid size-6 place-items-center rounded-md bg-brand text-brand-foreground shadow-[0_0_20px_-4px_var(--brand)]">
-        <LogoMark className="size-3.5" />
-      </span>
+      {/* The PNG already carries its own rounded pink tile, so no bg/rounded wrapper here,
+          or you'd get a square-in-a-square. alt="" + aria-hidden: the "Emissa" text next to it
+          is the accessible name; announcing the image too would just say it twice.
+          draggable={false} stops WebView2's native image drag from hijacking the title bar's drag region. */}
+      <img
+        src={logoUrl}
+        alt=""
+        aria-hidden
+        draggable={false}
+        // filter: drop-shadow traces the PNG's alpha (rounded tile); box-shadow would glow
+        // around the <img>'s square box instead.
+        className="size-6 drop-shadow-[0_0_6px_color-mix(in_oklab,var(--brand)_60%,transparent)]"
+      />
       Emissa
     </div>
   );
