@@ -30,3 +30,4 @@ src-tauri/gen/schemas
 # Never commit Google OAuth client secrets
 *client_secret*.json
 google_client.json
+[Dd]esktop.ini
